@@ -4,7 +4,7 @@ if (!isset($_SESSION)) {
 }
 include_once '../utils.php';
 include_once '../db_connection.php'; // Include the database connection file
-include_once $_SERVER['DOCUMENT_ROOT'] . '/Final2/posts/navbar.php';
+include_once '../posts/navbar.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = $_POST['username'];
@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $stmt->fetch();
 
         // Check if user exists and password matches
-        if ($user && $password === $user['password']) {
+        if ($user && $password === $user['password']) { //was going to hash pw w password_verify($password, $user['password']) but was causing issues on update and admin.php pages, 
             $_SESSION['username'] = $username; // Set session for logged-in user
             $userRole = getUserRole($db, $username);
             if ($userRole == 2) {
@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <title>Login</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/Final2/css/styles.css">
+    <link rel="stylesheet" href="../css/styles.css">
 </head>
 
 <body>
