@@ -47,8 +47,8 @@ h1 {
 
 /* Image Styles */
 .image-container {
-    width: 30vw;
-    height: 30vw;
+    width: 400;
+    height: auto;
     margin: 20px auto;
     border: 2px solid #ddd;
     border-radius: 8px;
