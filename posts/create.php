@@ -38,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Handle image upload
 	$photo_url = 'default.png'; // Default to empty if no file uploaded
+	$photoUrl = 'default.png';
 	if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
 		$photoTmpPath = $_FILES['photo']['tmp_name'];
 		$photoName = basename($_FILES['photo']['name']);

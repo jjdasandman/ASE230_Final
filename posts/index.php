@@ -3,8 +3,12 @@ session_start();
 include_once '../utils.php';
 include_once '../db_connection.php';
 include_once 'navbar.php';
-$username = $_SESSION['username'];
+//$username = $_SESSION['username'];
 $isAdmin = isset($_SESSION['isValidAdmin']) && $_SESSION['isValidAdmin'] ? true : false;
+if (!isset($_SESSION['username'])) {
+    $_SESSION['username'] = null;
+}
+
 $username = isset($_SESSION['username']) ? $_SESSION['username'] : null;
 
 // Fetch posts from the database
@@ -51,7 +55,7 @@ if (isset($_POST['sort'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>All Blog Posts</title>
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/Final2/css/styles.css">
+    <link rel="stylesheet" href="../css/styles.css">
 
     
 </head>
@@ -89,29 +93,29 @@ if (isset($_POST['sort'])) {
         </form>
 
         <div class="row">
-            <?php foreach ($posts as $post): ?>
-                <div class="col-md-4">
-                    <div class="card">
-                        <img src="../uploads/<?php echo htmlspecialchars($post['photo_url']); ?>" class="card-img-top"
-                            alt="Post Image">
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                <a href="detail.php?post_id=<?php echo $post['post_id']; ?>">
-                                    <?php echo htmlspecialchars($post['title']); ?>
-                                </a>
-                            </h5>
-                            <p class="card-text">By <?php echo htmlspecialchars($post['username']); ?> on
-                                <?php echo htmlspecialchars($post['created_at']); ?>
-                            </p>
-                            <p class="card-text">
-                                <?php echo htmlspecialchars(substr($post['description'], 0, 100)) . '...'; ?>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    </div>
+			<?php foreach ($posts as $post): ?>
+				<div class="col-md-4">
+					<div class="card">
+						<img src="../uploads/<?php echo htmlspecialchars($post['photo_url']); ?>" class="card-img-top"
+							alt="Post Image">
+						<div class="card-body">
+							<h5 class="card-title">
+								<a href="detail.php?post_id=<?php echo $post['post_id']; ?>">
+									<?php echo htmlspecialchars($post['title']); ?>
+								</a>
+							</h5>
+							<p class="card-text">By <?php echo htmlspecialchars($post['username']); ?> on
+								<?php echo htmlspecialchars(date('Y-m-d', strtotime($post['created_at']))); ?>
+							</p>
+							<p class="card-text">
+								<?php echo htmlspecialchars(substr($post['description'], 0, 100)) . '...'; ?>
+							</p>
+						</div>
+					</div>
+				</div>
+			<?php endforeach; ?>
+		</div>
+	</div>
 </body>
 
 </html>
