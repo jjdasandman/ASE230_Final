@@ -1,6 +1,6 @@
 <?php
-
-include '../utils.php';
+include_once '../utils.php';
+include_once '../db_connection.php';
 
 if (!isset($_SESSION['username'])) {
     header('Location: ../auth/login.php');
@@ -8,18 +8,19 @@ if (!isset($_SESSION['username'])) {
 }
 
 $username = $_SESSION['username'];
-$posts = loadPostsFromJSON('../posts.json');
 
+// Fetch posts from the database
+$posts = loadPostsFromDatabase($db);
 
 // Function to display the user's posts
 function displayUserPosts($posts, $username) {
-    foreach ($posts as $index => $post) {
-        if ($post['author'] === $username) {
-            $post_id = $index; // Use the index as the post ID
+    foreach ($posts as $post) {
+        if ($post['username'] === $username) {
+            $post_id = $post['post_id']; // Use post_id from the database as the ID
             echo "<div class='card my-3'>";
             echo "<div class='card-body'>";
-            echo "<h5 class='card-title'><a href='../posts/detail.php?post_id={$post_id}'>{$post['title']}</a></h5>";
-            echo "<p class='card-text'>By {$post['author']} on {$post['date']}</p>";
+            echo "<h5 class='card-title'><a href='../posts/detail.php?post_id={$post_id}'>" . htmlspecialchars($post['title']) . "</a></h5>";
+            echo "<p class='card-text'>By " . htmlspecialchars($post['username']) . " on " . htmlspecialchars($post['created_at']) . "</p>";
             echo "</div>";
             echo "</div>";
         }

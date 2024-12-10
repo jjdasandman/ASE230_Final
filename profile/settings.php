@@ -1,33 +1,31 @@
 <?php
-
-include '../utils.php';
+include_once '../utils.php';
+include_once '../db_connection.php';  // Include your database connection
 
 if (!isset($_SESSION['username'])) {
     header('Location: ../auth/login.php');
     exit();
 }
 
-$users = loadUsersFromJSON('../users.json');
-$posts = loadPostsFromJSON('../posts.json');
 $username = $_SESSION['username'];
 
 // Handle form submission for updating user info
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Retrieve the new username and password safely
     $new_username = isset($_POST['username']) ? $_POST['username'] : '';
-    $new_password = !empty($_POST['password']) ? password_hash($_POST['password'], PASSWORD_DEFAULT) : null;
+    $new_password = !empty($_POST['password']) ? $_POST['password'] : null;
 
-    // Update user details in users.json
+    // Update user details in database
     if (isset($_POST['delete_account'])) {
         // Confirm before deletion
         if (isset($_POST['confirm_delete'])) {
-            // Remove user from users.json
-            unset($users[$username]);
-            saveUsersToJSON('../users.json', $users);
+            // Delete user posts from the posts table
+            $stmt = $db->prepare("DELETE FROM clothingpost WHERE username = :username");
+            $stmt->execute([':username' => $username]);
 
-            // Remove all posts by the user
-            $posts = array_filter($posts, fn($post) => $post['author'] !== $username);
-            savePostsToJSON('../posts.json', $posts);
+            // Delete user from the users table
+            $stmt = $db->prepare("DELETE FROM User WHERE username = :username");
+            $stmt->execute([':username' => $username]);
 
             // Log out and redirect to signup
             session_destroy();
@@ -38,39 +36,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } else {
         // Check if the new username is already taken
-        if (array_key_exists($new_username, $users) && $new_username !== $username) {
-            echo "Username already taken!";
-        } else {
-            // Update username and password in users.json
-            if ($new_password) {
-                $users[$new_username] = $new_password;
+        if ($new_username && $new_username !== $username) {
+            $stmt = $db->prepare("SELECT COUNT(*) FROM User WHERE username = :new_username");
+            $stmt->execute([':new_username' => $new_username]);
+            $count = $stmt->fetchColumn();
+
+            if ($count > 0) {
+                echo "Username already taken!";
             } else {
-                $users[$new_username] = $users[$username]; // Retain the old password if not updating
-            }
+                // First, update username in the User table
+                $stmt = $db->prepare("UPDATE User SET username = :new_username WHERE username = :username");
+                $stmt->execute([':new_username' => $new_username, ':username' => $username]);
 
-            // Remove old username entry
-            if ($new_username !== $username) {
-                unset($users[$username]);
-            }
+                // Now update username in the clothingpost table (the foreign key table)
+                $stmt = $db->prepare("UPDATE clothingpost SET username = :new_username WHERE username = :username");
+                $stmt->execute([':new_username' => $new_username, ':username' => $username]);
 
-            saveUsersToJSON('../users.json', $users);
-
-            // Update posts with the new username
-            foreach ($posts as &$post) {
-                if ($post['author'] === $username) {
-                    $post['author'] = $new_username;
+                if ($new_password) {
+                    // If password is being updated, hash it before saving
+                    //$new_password_hashed = password_hash($new_password, PASSWORD_DEFAULT);
+                    $stmt = $db->prepare("UPDATE User SET password = :password WHERE username = :username");
+                    $stmt->execute([':password' => $new_password, ':username' => $new_username]);
                 }
-            }
-            savePostsToJSON('../posts.json', $posts);
 
-            // Update session
-            $_SESSION['username'] = $new_username;
+                // Update session with the new username
+                $_SESSION['username'] = $new_username;
+                header('Location: index.php');
+                exit();
+            }
+        } else {
+            // If no username change or it's valid
+            if ($new_password) {
+                // If password is being updated, hash it before saving
+                //$new_password_hashed = password_hash($new_password, PASSWORD_DEFAULT);
+                $stmt = $db->prepare("UPDATE User SET password = :password WHERE username = :username");
+                $stmt->execute([':password' => $new_password, ':username' => $username]);
+            }
+
             header('Location: index.php');
             exit();
         }
-    }
+    } 
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -85,11 +94,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <form method="POST" action="settings.php">
             <div class="form-group">
                 <label for="username">New Username</label>
-                <input type="text" class="form-control" id="username" name="username" required value="<?= htmlspecialchars($username) ?>">
+                <input type="text" class="form-control" id="username" name="username" value="<?= htmlspecialchars($username) ?>" placeholder="Leave blank if not changing">
             </div>
             <div class="form-group">
                 <label for="password">New Password (leave blank if not changing)</label>
-                <input type="password" class="form-control" id="password" name="password">
+                <input type="password" class="form-control" id="password" name="password" placeholder="Leave blank if not changing">
             </div>
             <button type="submit" class="btn btn-primary">Update Account</button>
         </form>
