@@ -1,11 +1,11 @@
-<?php
+<?php 
 if (!isset($_SESSION)) {
     session_start();
 }
 
 include_once 'utils.php';
-include_once 'db_connection.php'; // Include your database connection
-include_once $_SERVER['DOCUMENT_ROOT'] . '/Final2/posts/navbar.php';
+include_once 'db_connection.php';
+include_once 'navbar.php';
 
 // Check if the logged-in user is an admin
 if (!isset($_SESSION['username'])) {
@@ -13,75 +13,66 @@ if (!isset($_SESSION['username'])) {
     exit();
 }
 
-// Fetch role of the user
 $userId = getUserRole($db, $_SESSION['username']);
-if (!$user || $userId != 2) { // Assuming role_id = 2 is for admin
+if (!$userId || $userId != 2) { // Assuming role_id = 2 is for admin
     echo "Access denied. You do not have the necessary privileges.";
     exit();
 }
 
-// Handle updates
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update'])) {
-    $table = preg_replace('/[^a-zA-Z0-9_]/', '', $_POST['table']); // Sanitize table name
-    $field = preg_replace('/[^a-zA-Z0-9_]/', '', $_POST['field']); // Sanitize field name
-    echo "Table: " . $table . " Field: " . $field;
+// Handle row creation
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create'])) {
+    $table = preg_replace('/[^a-zA-Z0-9_]/', '', $_POST['table']);
+    try {
+        $columns = array_keys($_POST['fields']);
+        $values = array_values($_POST['fields']);
 
-    $value = $_POST['value'];
-    $recordId = $_POST['id']; // ID from form submission (not always 'id')
+        $columnList = implode(", ", $columns);
+        $placeholders = implode(", ", array_fill(0, count($columns), '?'));
 
-    // Fetch the primary key dynamically
-    $primaryKeyQuery = $db->prepare("SHOW KEYS FROM $table WHERE Key_name = 'PRIMARY'");
-    $primaryKeyQuery->execute();
-    $primaryKeyResult = $primaryKeyQuery->fetch(PDO::FETCH_ASSOC);
-    $primaryKey = $primaryKeyResult['Column_name'] ?? null;
+        $stmt = $db->prepare("INSERT INTO $table ($columnList) VALUES ($placeholders)");
+        $stmt->execute($values);
+        $success = "Row added successfully.";
+    } catch (PDOException $e) {
+        error_log("Error inserting row into $table: " . $e->getMessage());
+        $error = "An error occurred while adding the row.";
+    }
+}
 
-    if ($primaryKey) {
-        // Debug: Print primary key and the values being updated
-        echo "Primary Key: " . $primaryKey . "<br>";
-        echo "Record ID: " . $recordId . "<br>";
+// Handle row deletion
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete'])) {
+    $table = preg_replace('/[^a-zA-Z0-9_]/', '', $_POST['table']);
+    $recordId = $_POST['id'];
 
-        // Fetch current value of the field before updating
-        $currentValueQuery = $db->prepare("SELECT $field FROM $table WHERE $primaryKey = :id");
-        $currentValueQuery->execute([':id' => $recordId]);
-        $currentValue = $currentValueQuery->fetchColumn();
-        echo "Current Value: " . $currentValue . "<br>";
-        echo "New Value: " . $value . "<br>";
+    try {
+        $primaryKeyQuery = $db->prepare("SHOW KEYS FROM $table WHERE Key_name = 'PRIMARY'");
+        $primaryKeyQuery->execute();
+        $primaryKeyResult = $primaryKeyQuery->fetch(PDO::FETCH_ASSOC);
+        $primaryKey = $primaryKeyResult['Column_name'] ?? null;
 
-        if ($currentValue != $value) {
-            // Construct the update query dynamically
-            $query = "UPDATE $table SET $field = :value WHERE $primaryKey = :id";
-            echo "Executing query: " . $query . " with value: " . $value . "<br>";
-
-            $stmt = $db->prepare($query);
-            $stmt->execute([':value' => $value, ':id' => $recordId]);
-
-            // Check if any rows were updated
-            if ($stmt->rowCount() > 0) {
-                echo "Record updated successfully.";
-            } else {
-                echo "No rows updated. The value might be the same as before or no matching record was found.";
-            }
+        if ($primaryKey) {
+            $stmt = $db->prepare("DELETE FROM $table WHERE $primaryKey = :id");
+            $stmt->execute([':id' => $recordId]);
+            $success = "Row deleted successfully.";
         } else {
-            echo "The new value is the same as the current value. No update performed.";
+            $error = "No primary key found for the table.";
         }
-    } else {
-        echo "No primary key found for the table.";
+    } catch (PDOException $e) {
+        error_log("Error deleting row from $table: " . $e->getMessage());
+        $error = "An error occurred while deleting the row.";
     }
 }
 
 // Fetch all tables
-$tables = ['clothingpost', 'clothingtype', 'colors', 'materials', 'role', 'user']; // Add your database table names here
+$tables = ['clothingpost', 'clothingtype', 'colors', 'materials', 'role', 'user'];
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <title>Admin Area</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/Final2/css/styles.css">
+    <link rel="stylesheet" href="css/styles.css">
 </head>
-
 <body>
     <div class="container">
         <h1>Admin Area</h1>
@@ -100,10 +91,8 @@ $tables = ['clothingpost', 'clothingtype', 'colors', 'materials', 'role', 'user'
                 <thead>
                     <tr>
                         <?php
-                        // Fetch table columns
                         $columns = $db->query("SHOW COLUMNS FROM $table")->fetchAll(PDO::FETCH_COLUMN);
                         foreach ($columns as $column) {
-                            
                             echo "<th>" . htmlspecialchars($column) . "</th>";
                         }
                         ?>
@@ -112,34 +101,45 @@ $tables = ['clothingpost', 'clothingtype', 'colors', 'materials', 'role', 'user'
                 </thead>
                 <tbody>
                     <?php
-                    // Fetch primary key of the table
                     $primaryKeyQuery = $db->prepare("SHOW KEYS FROM $table WHERE Key_name = 'PRIMARY'");
                     $primaryKeyQuery->execute();
                     $primaryKeyResult = $primaryKeyQuery->fetch(PDO::FETCH_ASSOC);
                     $primaryKey = $primaryKeyResult['Column_name'] ?? null;
 
-                    // Fetch table data
                     $data = $db->query("SELECT * FROM $table")->fetchAll(PDO::FETCH_ASSOC);
+
                     foreach ($data as $row): ?>
                         <tr>
-                            <?php foreach ($row as $key => $value): ?>
-                                <td>
-                                    <form method="POST" style="display:inline-block;">
-                                        <input type="hidden" name="table" value="<?php echo htmlspecialchars($table); ?>">
-                                        <input type="hidden" name="id" value="<?php echo htmlspecialchars($row[$primaryKey]); ?>">
-                                        <input type="hidden" name="primary_key"
-                                            value="<?php echo htmlspecialchars($primaryKey); ?>">
-                                        <input type="hidden" name="field" value="<?php echo htmlspecialchars($key); ?>">
-                                        <input type="text" name="value" value="<?php echo htmlspecialchars($value); ?>"
+                            <form method="POST" style="display:inline-block;">
+                                <input type="hidden" name="table" value="<?php echo htmlspecialchars($table); ?>">
+                                <input type="hidden" name="id" value="<?php echo htmlspecialchars($row[$primaryKey]); ?>">
+                                
+                                <?php foreach ($row as $key => $value): ?>
+                                    <td>
+                                        <input type="text" name="fields[<?php echo htmlspecialchars($key); ?>]" value="<?php echo htmlspecialchars($value); ?>"
                                             class="form-control">
+                                    </td>
+                                <?php endforeach; ?>
+                                <td>
+                                    <button type="submit" name="update" class="btn btn-success btn-sm mt-2">Save</button>
+                                    <button type="submit" name="delete" class="btn btn-danger btn-sm mt-2">Delete</button>
+                                </td>
+                            </form>
+                        </tr>
+                    <?php endforeach; ?>
+                    <tr>
+                        <form method="POST">
+                            <input type="hidden" name="table" value="<?php echo htmlspecialchars($table); ?>">
+                            <?php foreach ($columns as $column): ?>
+                                <td>
+                                    <input type="text" name="fields[<?php echo htmlspecialchars($column); ?>]" class="form-control">
                                 </td>
                             <?php endforeach; ?>
                             <td>
-                                <button type="submit" name="update" class="btn btn-success btn-sm">Save</button>
-                                </form>
+                                <button type="submit" name="create" class="btn btn-primary btn-sm mt-2">Add</button>
                             </td>
-                        </tr>
-                    <?php endforeach; ?>
+                        </form>
+                    </tr>
                 </tbody>
             </table>
         <?php endforeach; ?>
@@ -147,5 +147,4 @@ $tables = ['clothingpost', 'clothingtype', 'colors', 'materials', 'role', 'user'
         <a href="posts/index.php" class="btn btn-secondary">Back to Posts</a>
     </div>
 </body>
-
 </html>
